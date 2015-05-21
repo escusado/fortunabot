@@ -165,7 +165,6 @@ Class('Fortunabot')({
     }.bind(this);
 
     //only if matches happened
-    console.log('>>>>', tweets);
     if(tweets.length){
       doTweet(tweets.pop());
     }else{
