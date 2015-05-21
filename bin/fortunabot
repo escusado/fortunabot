@@ -4,9 +4,21 @@ require('neon');
 
 var myRootRef, appData,
     fs = require('fs'),
-    TwitterClient = require('../lib/twitter_client'),
+    Firebase = require('firebase'),
+
     configData = JSON.parse(fs.readFileSync('config/config.json', 'utf-8')),
-    Firebase = require('firebase');
+
+    TwitterClient = require('../lib/twitter_client'),
+    Matcher = require('../lib/matcher');
+
+var BOT_COMMAND = 'matchme',
+    ENDPOINT_MENTIONS = '/matcher/mentions/',
+    ENDPOINT_TOPICS   = '/matcher/topics/',
+    ENDPOINT_UNMATCHED_USERS   = '/matcher/unmatchedUsers/',
+    ref,
+    refMentions,
+    refTopics,
+    refUnmatchedUsers;
 
 /**
  * Fortunabot a bot that matches people with stuff!
@@ -31,22 +43,138 @@ Class('Fortunabot')({
   matchPeople : function matchPeople (config){
 
     ref = new Firebase(config.firebaseUrl);
+    refMentions = new Firebase(config.firebaseUrl+ENDPOINT_MENTIONS);
+    refTopics = new Firebase(config.firebaseUrl+ENDPOINT_TOPICS);
+    refUnmatchedUsers = new Firebase(config.firebaseUrl+ENDPOINT_UNMATCHED_USERS);
 
-    ref.on("value", function (snapshot) {
-      appData = snapshot.val()
+    ref.set({
+      topics : ['vampires', 'light', 'fire']
+    }, function(){
+      // console.log('>>>>>>', 'saved');
+    });
+
+    ref.once("value", function (snapshot) {
+      appData = snapshot.val();
+
+      appData.mentions = appData.mentions || [];
+      appData.unmatchedUsers = appData.unmatchedUsers || [];
+      appData.topics = appData.topics || ['vampires', 'light'];
+
       this._process();
     }.bind(this), function (errorObject) {
-      console.log("The read failed: " + errorObject.code);
+      // console.log("The read failed: " + errorObject.code);
     });
 
   },
 
   _process : function _process(){
     TwitterClient.getMentions(function(mentions){
-      mentions.forEach(function mentionInterator (mention, index) {
-        console.log('>>', mention.user.screen_name);
+
+      mentions = mentions.filter(function (mention) {
+        return appData.mentions.indexOf(mention.id) < 0;
       });
+
+      //clear mentions
+      // console.log('>>>', mentions);
+
+      mentions.forEach(function mentionInterator (mention, index) {
+        var noCommandPresent = true, alreadyUnmatchedUser;
+
+        if (mention.entities.hashtags.length) {
+          mention.entities.hashtags.forEach(function(hashtag){
+            // console.log('>>>', hashtag, BOT_COMMAND, hashtag.text === BOT_COMMAND);
+            if(hashtag.text === BOT_COMMAND){
+              noCommandPresent = false;
+            }
+          })
+        }
+
+        // console.log('>>', mention.entities.hashtags);
+
+        if(noCommandPresent){
+          return;
+        }
+
+        appData.mentions.push(mention.id);
+
+        alreadyUnmatchedUser = appData.unmatchedUsers.some(function(user){
+          user.name === mention.user.screen_name;
+        });
+
+        //already on the list?
+        if(alreadyUnmatchedUser){
+          return;
+        }
+
+        appData.unmatchedUsers.push({
+          name: '@'+mention.user.screen_name}
+        );
+
+        this._runMatcher();
+
+      }.bind(this));
+    }.bind(this));
+  },
+
+  _runMatcher : function _runMatcher () {
+
+    // console.log('>>>>>>>');
+    // console.log(appData);
+    // console.log('<<<<<<<\n');
+
+    var tweets,
+        matcher = new Matcher({
+          // users : [{name: '@pigeonfolk'}, { name: '@escusado' }],
+          users : appData.unmatchedUsers,
+          topics : appData.topics,
+          minimumSize : 2
+        });
+
+    matcher.match(function (err, matchArray) {
+      if (err) {
+        // console.log('darn!', err);
+      }
+
+      tweets = matchArray;
+      // console.log('>>>', tweets);
+
+      // The users object now only contains the unpaired, if anyone was
+      // left behind, or if no matches were made.
+      if (matcher.users.length) {
+        appData.unmatchedUsers = matcher.users;
+      }
     });
+
+    // console.log('>>>>', tweets);
+
+    var doTweet = function doTweet(tweet){
+      TwitterClient.post(tweet, function(){
+        // console.log('> tweets', tweets);
+        if(tweets.length){
+          doTweet(tweets.pop());
+        }else{
+
+          this._persistData(function(){
+            // console.log('> finished');
+            process.exit(0);
+          }.bind(this))
+
+        }
+      }.bind(this));
+    }.bind(this);
+
+      // console.log('> tweets p', tweets);
+
+    if(tweets){
+      doTweet(tweets.pop());
+    }
+
+  },
+
+  _persistData : function _persistData (cb) {
+    ref.set(appData, function(){
+      cb();
+    })
   }
 
 });

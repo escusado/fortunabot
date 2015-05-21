@@ -4,7 +4,6 @@
   "clientKey": "",
   "clientSecret": "",
 
-
   "firebaseUrl" : "",
   "firebaseToken" : ""
 }
