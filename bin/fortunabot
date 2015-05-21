@@ -1,0 +1,55 @@
+#!/usr/bin/env node
+
+require('neon');
+
+var myRootRef, appData,
+    fs = require('fs'),
+    TwitterClient = require('../lib/twitter_client'),
+    configData = JSON.parse(fs.readFileSync('config/config.json', 'utf-8')),
+    Firebase = require('firebase');
+
+/**
+ * Fortunabot a bot that matches people with stuff!
+
+appData: contains the persisted db
+
+ *
+ * ## Usage:
+ *
+ *  Fortunabot.matchPeople()
+ *
+ *  TwitterClient.getMentions('function(mentions){
+ *    console.log(mentions) // > [{mention}, {mention}, ...]
+ *  });
+ *
+ *  TwitterClient.post('status update string message');
+ *
+ * @class TwitterClient
+ */
+
+Class('Fortunabot')({
+  matchPeople : function matchPeople (config){
+
+    ref = new Firebase(config.firebaseUrl);
+
+    ref.on("value", function (snapshot) {
+      appData = snapshot.val()
+      this._process();
+    }.bind(this), function (errorObject) {
+      console.log("The read failed: " + errorObject.code);
+    });
+
+  },
+
+  _process : function _process(){
+    TwitterClient.getMentions(function(mentions){
+      mentions.forEach(function mentionInterator (mention, index) {
+        console.log('>>', mention.user.screen_name);
+      });
+    });
+  }
+
+});
+
+Fortunabot.matchPeople(configData);
+

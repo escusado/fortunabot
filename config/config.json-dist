@@ -3,4 +3,8 @@
   "twitterConsumerSecret" : "",
   "clientKey": "",
   "clientSecret": "",
+
+
+  "firebaseUrl" : "",
+  "firebaseToken" : ""
 }
