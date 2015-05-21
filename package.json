@@ -2,6 +2,7 @@
   "name": "Project",
   "description": "Description",
   "dependencies": {
+    "firebase": "^2.2.5",
     "neon": "^2.0.0"
   }
 }
