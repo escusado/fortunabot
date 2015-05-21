@@ -1,0 +1,7 @@
+{
+  "name": "Project",
+  "description": "Description",
+  "dependencies": {
+    "neon": "^2.0.0"
+  }
+}
