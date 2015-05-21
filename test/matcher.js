@@ -157,7 +157,7 @@ describe('Matcher', function () {
       it('it should call error if a topic is invalid', function (done) {
         var matcher = new Matcher({
           users : Support.users.high.slice(),
-          topics : Support.topics.wrongType,
+          topics : Support.topics.invalid,
           minimumSize : Support.minimumSize.low
         });
 
